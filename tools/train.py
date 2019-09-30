@@ -1,3 +1,4 @@
+# encoding=utf-8
 from __future__ import division
 import argparse
 import os
@@ -20,12 +21,13 @@ def parse_args():
         '--resume_from', help='the checkpoint file to resume from')
     parser.add_argument(
         '--validate',
+        default=True,
         action='store_true',
         help='whether to evaluate the checkpoint during training')
     parser.add_argument(
         '--gpus',
         type=int,
-        default=1,
+        default=2,
         help='number of gpus to use '
         '(only applicable to non-distributed training)')
     parser.add_argument('--seed', type=int, default=None, help='random seed')
@@ -47,6 +49,7 @@ def parse_args():
 
 
 def main():
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'                  # set the GPU than CUDA can see
     args = parse_args()
 
     cfg = Config.fromfile(args.config)
