@@ -1,3 +1,4 @@
+# encoding=utf-8
 import copy
 
 from mmdet.utils import build_from_cfg
@@ -6,15 +7,15 @@ from .registry import DATASETS
 
 
 def _concat_dataset(cfg, default_args=None):
-    ann_files = cfg['ann_file']
+    ann_files = cfg['ann_file']                       # 标签路径
     img_prefixes = cfg.get('img_prefix', None)
     seg_prefixes = cfg.get('seg_prefixes', None)
     proposal_files = cfg.get('proposal_file', None)
 
     datasets = []
-    num_dset = len(ann_files)
+    num_dset = len(ann_files)            # for per ann_file in ann_files
     for i in range(num_dset):
-        data_cfg = copy.deepcopy(cfg)
+        data_cfg = copy.deepcopy(cfg)                  # 深度复制train.cfg
         data_cfg['ann_file'] = ann_files[i]
         if isinstance(img_prefixes, (list, tuple)):
             data_cfg['img_prefix'] = img_prefixes[i]
@@ -22,20 +23,21 @@ def _concat_dataset(cfg, default_args=None):
             data_cfg['seg_prefix'] = seg_prefixes[i]
         if isinstance(proposal_files, (list, tuple)):
             data_cfg['proposal_file'] = proposal_files[i]
-        datasets.append(build_dataset(data_cfg, default_args))
+        datasets.append(build_dataset(data_cfg, default_args))   # 将数据集中的标签和图片路径拆分并一一对应
+        # datasets is a set of config of dataset
 
-    return ConcatDataset(datasets)
+    return ConcatDataset(datasets)                               # 将不同源的数据集混合，数据存储在链表datasets中
 
 
 def build_dataset(cfg, default_args=None):
-    if isinstance(cfg, (list, tuple)):
+    if isinstance(cfg, (list, tuple)):                           # if the cfg compose of several
         dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg])
     elif cfg['type'] == 'RepeatDataset':
         dataset = RepeatDataset(
             build_dataset(cfg['dataset'], default_args), cfg['times'])
-    elif isinstance(cfg['ann_file'], (list, tuple)):
+    elif isinstance(cfg['ann_file'], (list, tuple)):              # 进入到这个if中
         dataset = _concat_dataset(cfg, default_args)
     else:
         dataset = build_from_cfg(cfg, DATASETS, default_args)
 
-    return dataset
+    return dataset                                                # 整合不同源数据集之后的数据集list，在这里都是coco源

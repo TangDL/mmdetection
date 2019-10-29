@@ -51,7 +51,7 @@ class AnchorHead(nn.Module):
         self.anchor_scales = anchor_scales
         self.anchor_ratios = anchor_ratios
         self.anchor_strides = anchor_strides
-        self.anchor_base_sizes = list(
+        self.anchor_base_sizes = list(                                                # [4, 8, 16, 32, 64]
             anchor_strides) if anchor_base_sizes is None else anchor_base_sizes
         self.target_means = target_means
         self.target_stds = target_stds
@@ -67,8 +67,8 @@ class AnchorHead(nn.Module):
         self.fp16_enabled = False
 
         self.anchor_generators = []
-        for anchor_base in self.anchor_base_sizes:
-            self.anchor_generators.append(
+        for anchor_base in self.anchor_base_sizes:                 # [4, 8, 16, 32, 64]
+            self.anchor_generators.append(                         # get the AnchorGenerator according to strides
                 AnchorGenerator(anchor_base, anchor_scales, anchor_ratios))
 
         self.num_anchors = len(self.anchor_ratios) * len(self.anchor_scales)
@@ -108,9 +108,9 @@ class AnchorHead(nn.Module):
         # anchors for one time
         multi_level_anchors = []
         for i in range(num_levels):
-            anchors = self.anchor_generators[i].grid_anchors(
+            anchors = self.anchor_generators[i].grid_anchors(               # get anchor according to config
                 featmap_sizes[i], self.anchor_strides[i])
-            multi_level_anchors.append(anchors)
+            multi_level_anchors.append(anchors)                             # all anchors for per image
         anchor_list = [multi_level_anchors for _ in range(num_imgs)]
 
         # for each image, we compute valid flags of multi level anchors

@@ -1,14 +1,21 @@
+#encoding=utf-8
 from __future__ import division
 
 import torch
+import os
 import torch.nn as nn
+import cv2
+import mmcv
+import numpy as np
 
-from mmdet.core import (bbox2result, bbox2roi, build_assigner, build_sampler,
-                        merge_aug_masks)
+from mmdet.core import (bbox2result, bbox2roi, bbox_mapping, build_assigner,
+                        build_sampler, merge_aug_bboxes, merge_aug_masks,
+                        multiclass_nms)
 from .. import builder
 from ..registry import DETECTORS
 from .base import BaseDetector
 from .test_mixins import RPNTestMixin
+
 
 
 @DETECTORS.register_module
@@ -31,11 +38,11 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
         assert bbox_head is not None
         super(CascadeRCNN, self).__init__()
 
-        self.num_stages = num_stages
-        self.backbone = builder.build_backbone(backbone)
+        self.num_stages = num_stages                            # 4
+        self.backbone = builder.build_backbone(backbone)        # 搭建resnext的backbone
 
         if neck is not None:
-            self.neck = builder.build_neck(neck)
+            self.neck = builder.build_neck(neck)                 # 搭建fpn
 
         if rpn_head is not None:
             self.rpn_head = builder.build_head(rpn_head)
@@ -89,7 +96,7 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
     def with_rpn(self):
         return hasattr(self, 'rpn_head') and self.rpn_head is not None
 
-    def init_weights(self, pretrained=None):
+    def init_weights(self, pretrained=None):                       # 初始化权�?
         super(CascadeRCNN, self).init_weights(pretrained)
         self.backbone.init_weights(pretrained=pretrained)
         if self.with_neck:
@@ -111,7 +118,14 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
                     self.mask_roi_extractor[i].init_weights()
                 self.mask_head[i].init_weights()
 
-    def extract_feat(self, img):
+    def extract_feat(self, img, template_img):                          # 提取特征，并经过fpn�?
+        # defect_img, template_img = img[:,0:3,:,:], img[:,3:6,:,:]
+        x, x1 = self.backbone(img, template_img)                 # 想办法在将两张图片合并层一张，就完全实现了
+        if self.with_neck:
+            x = self.neck(x, x1)
+        return x
+
+    def extract_feats_original(self, img):  # 提取特征，并经过fpn�?
         x = self.backbone(img)
         if self.with_neck:
             x = self.neck(x)
@@ -156,8 +170,24 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       proposals=None):
-        x = self.extract_feat(img)
 
+        # my first attemp to send two images in network--------------------------------------------------------------
+        image_name = img_meta[0]["filename"]
+        template_root_path = "/data1/bupi_data/round2/all_template/"
+        template_name = template_root_path + '/template_' + image_name.split('/')[-1].split('_')[0] + '.jpg'
+        template_img = cv2.imread(template_name)                         #读取模板图片
+
+        _, _, h, w = img.shape                                              # 读取瑕疵图片的尺�?
+        template_img = cv2.resize(template_img, (w, h))                  # 将模板图片resize到瑕疵图片的尺寸
+        template_img = mmcv.imnormalize(template_img, mean=[123.675, 116.28, 103.53],   # 归一�?
+                                           std=[58.395, 57.12, 57.375], to_rgb=True)
+        template_img = template_img.transpose(2, 0, 1)                    # 将模板的维度变成瑕疵图片的维�?
+        template_img = np.expand_dims(template_img, axis=0)               # �?维图片扩展成4�?
+        # 将模板图片从numpy变成FloatTensor，并放入GPU
+        template_img = torch.from_numpy(template_img).type(torch.FloatTensor).cuda(0)
+        assert img.shape == template_img.shape
+        # end my work---------------------------------------------------------------------------------------------
+        x = self.extract_feat(img, template_img)
         losses = dict()
 
         if self.with_rpn:
@@ -269,7 +299,30 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
         return losses
 
     def simple_test(self, img, img_meta, proposals=None, rescale=False):
-        x = self.extract_feat(img)
+        # my first attemp to send two images in network--------------------------------------------------------------
+        # print(img_meta)
+        image_name = img_meta[0]["filename"]
+        #template_root_path = "/data1/bupi_data/round2/all_template/"
+        template_root_path = os.path.dirname(image_name)
+        if image_name.split('/')[-1].startswith("template"):
+            template_name = image_name
+        else:
+            template_name = template_root_path + '/template_' + image_name.split('/')[-1].split('_')[0] + '.jpg'
+        # print(template_name)
+        template_img = cv2.imread(template_name)          # 读取模板图片
+
+
+        _, _, h, w = img.shape                            # 读取瑕疵图片的尺�?
+        template_img = cv2.resize(template_img, (w, h))   # 将模板图片resize到瑕疵图片的尺寸
+        template_img = mmcv.imnormalize(template_img, mean=[123.675, 116.28, 103.53],  # 归一�?
+                                        std=[58.395, 57.12, 57.375], to_rgb=True)
+        template_img = template_img.transpose(2, 0, 1)  # 将模板的维度变成瑕疵图片的维�?
+        template_img = np.expand_dims(template_img, axis=0)  # �?维图片扩展成4�?
+        # 将模板图片从numpy变成FloatTensor，并放入GPU
+        template_img = torch.from_numpy(template_img).type(torch.FloatTensor).cuda(0)
+        assert img.shape == template_img.shape
+        # end my work---------------------------------------------------------------------------------------------
+        x = self.extract_feat(img, template_img)
         proposal_list = self.simple_test_rpn(
             x, img_meta, self.test_cfg.rpn) if proposals is None else proposals
 
@@ -399,8 +452,110 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
 
         return results
 
-    def aug_test(self, img, img_meta, proposals=None, rescale=False):
-        raise NotImplementedError
+    def aug_test(self, imgs, img_metas, proposals=None, rescale=False):
+        """Test with augmentations.
+
+               If rescale is False, then returned bboxes and masks will fit the scale
+               of imgs[0].
+               """
+        # recompute feats to save memory
+        proposal_list = self.aug_test_rpn(
+            self.extract_feats(imgs), img_metas, self.test_cfg.rpn)
+
+        rcnn_test_cfg = self.test_cfg.rcnn
+        aug_bboxes = []
+        aug_scores = []
+        for x, img_meta in zip(self.extract_feats(imgs), img_metas):
+            # only one image in the batch
+            img_shape = img_meta[0]['img_shape']
+            scale_factor = img_meta[0]['scale_factor']
+            flip = img_meta[0]['flip']
+
+            proposals = bbox_mapping(proposal_list[0][:, :4], img_shape,
+                                     scale_factor, flip)
+            # "ms" in variable names means multi-stage
+            ms_scores = []
+
+            rois = bbox2roi([proposals])
+            for i in range(self.num_stages):
+                bbox_roi_extractor = self.bbox_roi_extractor[i]
+                bbox_head = self.bbox_head[i]
+
+                bbox_feats = bbox_roi_extractor(
+                    x[:len(bbox_roi_extractor.featmap_strides)], rois)
+                if self.with_shared_head:
+                    bbox_feats = self.shared_head(bbox_feats)
+
+                cls_score, bbox_pred = bbox_head(bbox_feats)
+                ms_scores.append(cls_score)
+
+                if i < self.num_stages - 1:
+                    bbox_label = cls_score.argmax(dim=1)
+                    rois = bbox_head.regress_by_class(rois, bbox_label,
+                                                      bbox_pred, img_meta[0])
+
+            cls_score = sum(ms_scores) / float(len(ms_scores))
+            bboxes, scores = self.bbox_head[-1].get_det_bboxes(
+                rois,
+                cls_score,
+                bbox_pred,
+                img_shape,
+                scale_factor,
+                rescale=False,
+                cfg=None)
+            aug_bboxes.append(bboxes)
+            aug_scores.append(scores)
+
+        # after merging, bboxes will be rescaled to the original image size
+        merged_bboxes, merged_scores = merge_aug_bboxes(
+            aug_bboxes, aug_scores, img_metas, rcnn_test_cfg)
+        det_bboxes, det_labels = multiclass_nms(merged_bboxes, merged_scores,
+                                                rcnn_test_cfg.score_thr,
+                                                rcnn_test_cfg.nms,
+                                                rcnn_test_cfg.max_per_img)
+
+        bbox_result = bbox2result(det_bboxes, det_labels,
+                                  self.bbox_head[-1].num_classes)
+
+        if self.with_mask:
+            if det_bboxes.shape[0] == 0:
+                segm_result = [[]
+                               for _ in range(self.mask_head[-1].num_classes -
+                                              1)]
+            else:
+                aug_masks = []
+                aug_img_metas = []
+                for x, img_meta in zip(self.extract_feats(imgs), img_metas):
+                    img_shape = img_meta[0]['img_shape']
+                    scale_factor = img_meta[0]['scale_factor']
+                    flip = img_meta[0]['flip']
+                    _bboxes = bbox_mapping(det_bboxes[:, :4], img_shape,
+                                           scale_factor, flip)
+                    mask_rois = bbox2roi([_bboxes])
+                    for i in range(self.num_stages):
+                        mask_feats = self.mask_roi_extractor[i](
+                            x[:len(self.mask_roi_extractor[i].featmap_strides
+                                   )], mask_rois)
+                        if self.with_shared_head:
+                            mask_feats = self.shared_head(mask_feats)
+                        mask_pred = self.mask_head[i](mask_feats)
+                        aug_masks.append(mask_pred.sigmoid().cpu().numpy())
+                        aug_img_metas.append(img_meta)
+                merged_masks = merge_aug_masks(aug_masks, aug_img_metas,
+                                               self.test_cfg.rcnn)
+
+                ori_shape = img_metas[0][0]['ori_shape']
+                segm_result = self.mask_head[-1].get_seg_masks(
+                    merged_masks,
+                    det_bboxes,
+                    det_labels,
+                    rcnn_test_cfg,
+                    ori_shape,
+                    scale_factor=1.0,
+                    rescale=False)
+            return bbox_result, segm_result
+        else:
+            return bbox_result
 
     def show_result(self, data, result, **kwargs):
         if self.with_mask:
@@ -412,3 +567,4 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
             if isinstance(result, dict):
                 result = result['ensemble']
         super(CascadeRCNN, self).show_result(data, result, **kwargs)
+        

@@ -11,7 +11,7 @@ def build(cfg, registry, default_args=None):
             build_from_cfg(cfg_, registry, default_args) for cfg_ in cfg
         ]
         return nn.Sequential(*modules)
-    else:
+    else:                                                          # 进入这里，registry是检测模块库
         return build_from_cfg(cfg, registry, default_args)
 
 
@@ -39,5 +39,5 @@ def build_loss(cfg):
     return build(cfg, LOSSES)
 
 
-def build_detector(cfg, train_cfg=None, test_cfg=None):
+def build_detector(cfg, train_cfg=None, test_cfg=None):        # 搭建模型的函数，输入时cfg中的dict
     return build(cfg, DETECTORS, dict(train_cfg=train_cfg, test_cfg=test_cfg))

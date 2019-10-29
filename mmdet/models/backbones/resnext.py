@@ -1,3 +1,4 @@
+#encoding=utf-8
 import math
 
 import torch.nn as nn
@@ -6,10 +7,10 @@ from mmdet.ops import DeformConv, ModulatedDeformConv
 from ..registry import BACKBONES
 from ..utils import build_conv_layer, build_norm_layer
 from .resnet import Bottleneck as _Bottleneck
-from .resnet import ResNet
+from .resnet import ResNet, ResNet2
 
 
-class Bottleneck(_Bottleneck):
+class Bottleneck(_Bottleneck):                     # 瓶颈
 
     def __init__(self, inplanes, planes, groups=1, base_width=4, **kwargs):
         """Bottleneck block for ResNeXt.
@@ -200,6 +201,76 @@ class ResNeXt(ResNet):
             dcn = self.dcn if self.stage_with_dcn[i] else None
             gcb = self.gcb if self.stage_with_gcb[i] else None
             planes = 64 * 2**i
+            res_layer = make_res_layer(
+                self.block,
+                self.inplanes,
+                planes,
+                num_blocks,
+                stride=stride,
+                dilation=dilation,
+                groups=self.groups,
+                base_width=self.base_width,
+                style=self.style,
+                with_cp=self.with_cp,
+                conv_cfg=self.conv_cfg,
+                norm_cfg=self.norm_cfg,
+                dcn=dcn,
+                gcb=gcb)
+            self.inplanes = planes * self.block.expansion
+            layer_name = 'layer{}'.format(i + 1)
+            self.add_module(layer_name, res_layer)
+            self.res_layers.append(layer_name)
+
+        self._freeze_stages()
+
+
+
+@BACKBONES.register_module
+class ResNeXt2(ResNet2):
+    """ResNeXt backbone.
+
+    Args:
+        depth (int): Depth of resnet, from {18, 34, 50, 101, 152}.
+        num_stages (int): Resnet stages, normally 4.
+        groups (int): Group of resnext.
+        base_width (int): Base width of resnext.
+        strides (Sequence[int]): Strides of the first block of each stage.
+        dilations (Sequence[int]): Dilation of each stage.
+        out_indices (Sequence[int]): Output from which stages.
+        style (str): `pytorch` or `caffe`. If set to "pytorch", the stride-two
+            layer is the 3x3 conv layer, otherwise the stride-two layer is
+            the first 1x1 conv layer.
+        frozen_stages (int): Stages to be frozen (all param fixed). -1 means
+            not freezing any parameters.
+        norm_cfg (dict): dictionary to construct and config norm layer.
+        norm_eval (bool): Whether to set norm layers to eval mode, namely,
+            freeze running stats (mean and var). Note: Effect on Batch Norm
+            and its variants only.
+        with_cp (bool): Use checkpoint or not. Using checkpoint will save some
+            memory while slowing down the training speed.
+        zero_init_residual (bool): whether to use zero init for last norm layer
+            in resblocks to let them behave as identity.
+    """
+
+    arch_settings = {
+        50: (Bottleneck, (3, 4, 6, 3)),
+        101: (Bottleneck, (3, 4, 23, 3)),
+        152: (Bottleneck, (3, 8, 36, 3))
+    }
+
+    def __init__(self, groups=1, base_width=4, **kwargs):
+        super(ResNeXt2, self).__init__(**kwargs)
+        self.groups = groups                          # 32
+        self.base_width = base_width                  # 4
+
+        self.inplanes = 64                            # 64
+        self.res_layers = []
+        for i, num_blocks in enumerate(self.stage_blocks):
+            stride = self.strides[i]                  # (1, 2, 2, 2)
+            dilation = self.dilations[i]              # (1, 1, 1, 1)
+            dcn = self.dcn if self.stage_with_dcn[i] else None   # None
+            gcb = self.gcb if self.stage_with_gcb[i] else None   # None
+            planes = 64 * 2**i                        # 64*2**[1,2,3,4]/128,256,512,1024
             res_layer = make_res_layer(
                 self.block,
                 self.inplanes,

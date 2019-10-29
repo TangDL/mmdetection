@@ -1,5 +1,6 @@
 import os.path as osp
 import warnings
+import cv2
 
 import mmcv
 import numpy as np
@@ -17,10 +18,33 @@ class LoadImageFromFile(object):
     def __call__(self, results):
         filename = osp.join(results['img_prefix'],
                             results['img_info']['filename'])
-        img = mmcv.imread(filename)
+        img = mmcv.imread(filename)                            # 将已经读取到的瑕疵图片存放到这里
+
+        # my second attemp to send 2 images into net
+        #         template_root_path = "/data1/bupi_data/round2/all_template/"
+        #         template_filename = template_root_path + 'template_' + filename.split('/')[-1].split('_')[0] + '.jpg'
+        #         template_img = mmcv.imread(template_filename)             # 将读取到的模板图片存放到这里
+        #         # 需要将瑕疵图片和模板图片的尺寸对应上，这里选择将模板图片resize到瑕疵图片的大小。注意：读入的模板图片是原图尺寸
+        #         h, w, _ = img.shape                                       # 得到瑕疵图片的高，宽
+        #         template_img = cv2.resize(template_img, (w, h))
+        #
+        #         print("template_img", template_img.shape, "img:", img.shape)
+        #         # img, template_img = img.transpose(2,0,1), template_img(2,0,1)   # 先将图片矩阵的维度进行变换，方便后面连接
+        #         # img = np.concatenate([img, template_img])                # 将两张图片拼接成6*905*1024的矩阵
+        #         # img = img.transpose(1, 2, 0)  # 最后将图片矩阵变换为905*1024*6。
+        #         img = np.dstack((img, template_img))
+        #
+        #         # 以上便完成了两张图片的读取与传入
+        #
+        #         print(img.shape, template_img.shape)
+        #         # 将模板图片和瑕疵图片合并，合并成6通道的
+        #         print(filename, "1111111111111111111111111111111111111111111111")
+
         if self.to_float32:
             img = img.astype(np.float32)
         results['filename'] = filename
+
+        # end--------------------------------------------------------------------------------
         results['img'] = img
         results['img_shape'] = img.shape
         results['ori_shape'] = img.shape

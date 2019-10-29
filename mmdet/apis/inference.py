@@ -60,13 +60,14 @@ class LoadImage(object):
         return results
 
 
-def inference_detector(model, img):
+def inference_detector(model, img, reverse=False):
     """Inference image(s) with the detector.
 
     Args:
         model (nn.Module): The loaded detector.
         imgs (str/ndarray or list[str/ndarray]): Either image files or loaded
             images.
+        reverse(bool):if reverse image
 
     Returns:
         If imgs is a str, a generator will be returned, otherwise return the
@@ -81,6 +82,7 @@ def inference_detector(model, img):
     data = dict(img=img)
     data = test_pipeline(data)
     data = scatter(collate([data], samples_per_gpu=1), [device])[0]
+    # print(np.shape(data))
     # forward the model
     with torch.no_grad():
         result = model(return_loss=False, rescale=True, **data)

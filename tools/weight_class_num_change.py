@@ -5,7 +5,7 @@ def main():
     #gen coco pretrained weight
     import torch
     num_classes = 21
-    model_coco = torch.load("/mmdetection/models/cascade_rcnn_r101_fpn_20e_20181129-b46dcede.pth")
+    model_coco = torch.load("/mmdetection/TDL/model/cascade_rcnn_r101_fpn_20e_20181129-b46dcede.pth")
 
     # weight
     model_coco["state_dict"]["bbox_head.0.fc_cls.weight"] = model_coco["state_dict"]["bbox_head.0.fc_cls.weight"][
@@ -37,7 +37,7 @@ def main():
 
 
     # save new model
-    torch.save(model_coco, "/mmdetection/models/cascade_rcnn_r101_fpn_20e_20181129-b46dcede.pth" )
+    torch.save(model_coco, "/mmdetection/TDL/model/cascade_rcnn_r101_coco_pretrained_weights_classes_%d.pth" % num_classes)
 
 if __name__ == "__main__":
     main()

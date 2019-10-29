@@ -2,7 +2,8 @@
 model = dict(
     type='CascadeRCNN',
     num_stages=3,
-    pretrained='open-mmlab://resnext101_32x4d',
+    # pretrained='open-mmlab://resnext101_32x4d',
+    pretrained=None,
     backbone=dict(
         type='ResNeXt',
         depth=101,
@@ -11,7 +12,14 @@ model = dict(
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
-        style='pytorch'),
+        style='pytorch',
+        # dcn=dict(
+            # modulated=False,
+            # groups=32,
+            # deformable_groups=1,
+           #  fallback_on_stride=False),
+        # stage_with_dcn=(False, True, True, True),
+    ),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
@@ -22,7 +30,7 @@ model = dict(
         in_channels=256,
         feat_channels=256,
         anchor_scales=[8],
-        anchor_ratios=[0.5, 1.0, 2.0],
+        anchor_ratios=[0.02, 0.05, 0.1, 0.5, 1.0, 2.0, 10.0, 20.0, 50.0],
         anchor_strides=[4, 8, 16, 32, 64],
         target_means=[.0, .0, .0, .0],
         target_stds=[1.0, 1.0, 1.0, 1.0],
@@ -41,7 +49,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=81,
+            num_classes=16,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.1, 0.1, 0.2, 0.2],
             reg_class_agnostic=True,
@@ -54,7 +62,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=81,
+            num_classes=16,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.05, 0.05, 0.1, 0.1],
             reg_class_agnostic=True,
@@ -67,7 +75,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=81,
+            num_classes=16,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.033, 0.033, 0.067, 0.067],
             reg_class_agnostic=True,
@@ -109,7 +117,7 @@ train_cfg = dict(
                 min_pos_iou=0.5,
                 ignore_iof_thr=-1),
             sampler=dict(
-                type='RandomSampler',
+                type='OHEMSampler',
                 num=512,
                 pos_fraction=0.25,
                 neg_pos_ub=-1,
@@ -124,7 +132,7 @@ train_cfg = dict(
                 min_pos_iou=0.6,
                 ignore_iof_thr=-1),
             sampler=dict(
-                type='RandomSampler',
+                type='OHEMSampler',
                 num=512,
                 pos_fraction=0.25,
                 neg_pos_ub=-1,
@@ -139,7 +147,7 @@ train_cfg = dict(
                 min_pos_iou=0.7,
                 ignore_iof_thr=-1),
             sampler=dict(
-                type='RandomSampler',
+                type='OHEMSampler',
                 num=512,
                 pos_fraction=0.25,
                 neg_pos_ub=-1,
@@ -167,7 +175,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
+    dict(type='Resize', img_scale=(2048, 905), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -178,8 +186,8 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1333, 800),
-        flip=False,
+        img_scale=(1228, 614),
+        flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
             dict(type='RandomFlip'),
@@ -190,12 +198,22 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=2,
+    imgs_per_gpu=1,
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_train2017.json',
-        img_prefix=data_root + 'train2017/',
+        ann_file=["/data1/bupi_data/round2/sparse_train_2coco_padding_1.json",
+                  "/data1/bupi_data/round2/val_coco.json",
+                  "/data1/bupi_data/round2/crop_val_image/after_slice_coco.json",
+                  "/data1/bupi_data/round2/dense_crop_train_image/crop_dense_train_coco_fixbox.json",
+                  "/data1/bupi_data/round2/sparse_crop_train_image/after_slice_coco.json"
+                  ],
+        img_prefix=["/data1/bupi_data/round2/sparse_trian_2coo_padding/",
+                    "/data1/bupi_data/round2/val/",
+                    "/data1/bupi_data/round2/crop_val_image/defect_image/",
+                    "/data1/bupi_data/round2/dense_crop_train_image/defect/",
+                    "/data1/bupi_data/round2/sparse_crop_train_image/defect_image/",
+                    ],
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
@@ -208,7 +226,7 @@ data = dict(
         img_prefix=data_root + 'val2017/',
         pipeline=test_pipeline))
 # optimizer
-optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=0.0025, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
@@ -230,7 +248,10 @@ log_config = dict(
 total_epochs = 12
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/cascade_rcnn_x101_32x4d_fpn_1x'
-load_from = None
+work_dir = '/data1/lgj/bupi/round2/work_dirs/resnext101_data_aug/'
+load_from = "/data1/lgj/bupi/round2/pretrained_model/epoch_12.pth"
+# load_from = None
 resume_from = None
 workflow = [('train', 1)]
+gpus_id = '0,1'
+gpus_num = 2

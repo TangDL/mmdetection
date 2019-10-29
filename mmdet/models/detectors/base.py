@@ -38,10 +38,14 @@ class BaseDetector(nn.Module):
     def extract_feat(self, imgs):
         pass
 
+    @abstractmethod
+    def extract_feats_original(self, imgs):
+        pass
+
     def extract_feats(self, imgs):
         assert isinstance(imgs, list)
         for img in imgs:
-            yield self.extract_feat(img)
+            yield self.extract_feats_original(img)
 
     @abstractmethod
     def forward_train(self, imgs, img_metas, **kwargs):

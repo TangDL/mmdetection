@@ -3,6 +3,8 @@ model = dict(
     type='CascadeRCNN',
     num_stages=3,
     pretrained='modelzoo://resnet101',
+    # pretrained="/root/resnext101_64x4d-ee2c6f71.pth",
+    # pretrained="/mmdetection/TDL/model/cascade_rcnn_r101_fpn_20e_20181129-b46dcede.pth",
     backbone=dict(
         type='ResNet',
         depth=101,
@@ -11,7 +13,9 @@ model = dict(
         frozen_stages=1,
         style='pytorch',
         dcn=dict(
-            modulated=False, deformable_groups=1, fallback_on_stride=False),
+            modulated=False,
+            deformable_groups=1,
+            fallback_on_stride=False),
         stage_with_dcn=(False, False, False, True)),
     neck=dict(
         type='FPN',
@@ -42,7 +46,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=21,
+            num_classes=16,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.1, 0.1, 0.2, 0.2],
             reg_class_agnostic=True,
@@ -55,7 +59,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=21,
+            num_classes=16,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.05, 0.05, 0.1, 0.1],
             reg_class_agnostic=True,
@@ -68,7 +72,7 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=21,
+            num_classes=16,
             target_means=[0., 0., 0., 0.],
             target_stds=[0.033, 0.033, 0.067, 0.067],
             reg_class_agnostic=True,
@@ -168,7 +172,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
+    dict(type='Resize', img_scale=(1296, 573), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -179,7 +183,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1333, 800),
+        img_scale=(1296, 573),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -191,25 +195,25 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=2,
+    imgs_per_gpu=1,
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file="/mmdetection/bupi/bupi/annotations/instances_train2017.json",
-        img_prefix="/mmdetection/bupi/bupi/images/train2017/",
+        ann_file="/data1/gzx/train_round2/train_coco_sparse.json",
+        img_prefix="/data1/gzx/train_round2/train/",
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file="/mmdetection/bupi/bupi/annotations/instances_val2017.json",
-        img_prefix="/mmdetection/bupi/bupi/images/val2017/",
+        ann_file="/mmdetection/bupi/bupi/annotations/instances_train2017.json",
+        img_prefix="/mmdetection/bupi/bupi/images/train2017/",
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file="/mmdetection/bupi/bupi/annotations/instances_val2017.json",
-        img_prefix="/mmdetection/bupi/bupi/images/guangdong1_round1_testA_20190818/",
+        ann_file="/mmdetection/bupi/bupi/annotations/instances_train2017.json",
+        img_prefix="/mmdetection/bupi/bupi/images/train2017/",
         pipeline=test_pipeline))
 # optimizer
-optimizer = dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=0.0025, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
@@ -231,7 +235,10 @@ log_config = dict(
 total_epochs = 200
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = '/mmdetection/TDL/result/cascade_rcnn_r101_fpn_20e/'
-load_from = None
-resume_from = "/mmdetection/TDL/result/cascade_rcnn_r101_fpn_20e/epoch_60.pth"
+work_dir = "/mmdetection/TDL/result/cascade_rcnn_r101_64x4d_fpn_1x"
+load_from = "/data1/DTL/model/cascadeRCNN/cascade_rcnn_r101_fpn_20e_20181129-b46dcede_16_9.pth"
+# resume_from = "/mmdetection/TDL/result/cascade_rcnn_r101_fpn_20e/epoch_150.pth"
+
+# load_from = None
+resume_from = None
 workflow = [('train', 1)]

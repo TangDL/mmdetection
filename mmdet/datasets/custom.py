@@ -131,8 +131,8 @@ class CustomDataset(Dataset):
                 continue
             return data
 
-    def prepare_train_img(self, idx):
-        img_info = self.img_infos[idx]
+    def prepare_train_img(self, idx):                           # 在这里面处理输入两张图片的问题，总可以了吧
+        img_info = self.img_infos[idx]                          # img_info里面包含单张图片的所有属性
         ann_info = self.get_ann_info(idx)
         results = dict(img_info=img_info, ann_info=ann_info)
         if self.proposals is not None:

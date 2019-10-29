@@ -86,6 +86,12 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
         if self.with_neck:
             x = self.neck(x)
         return x
+        
+    def extract_feats_original(self, img):  # 提取特征，并经过fpn�?
+        x = self.backbone(img)
+        if self.with_neck:
+            x = self.neck(x)
+        return x
 
     def forward_dummy(self, img):
         outs = ()

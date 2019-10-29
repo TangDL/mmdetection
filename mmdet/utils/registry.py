@@ -1,3 +1,4 @@
+#encoding=utf-8
 import inspect
 
 import mmcv
@@ -59,18 +60,18 @@ def build_from_cfg(cfg, registry, default_args=None):
     assert isinstance(cfg, dict) and 'type' in cfg
     assert isinstance(default_args, dict) or default_args is None
     args = cfg.copy()
-    obj_type = args.pop('type')
+    obj_type = args.pop('type')                  # 提取type字段，
     if mmcv.is_str(obj_type):
         obj_cls = registry.get(obj_type)
         if obj_cls is None:
             raise KeyError('{} is not in the {} registry'.format(
                 obj_type, registry.name))
-    elif inspect.isclass(obj_type):
+    elif inspect.isclass(obj_type):              # 如果是一个class返回true。一般都是进入到这里
         obj_cls = obj_type
     else:
         raise TypeError('type must be a str or valid type, but got {}'.format(
             type(obj_type)))
-    if default_args is not None:
+    if default_args is not None:                           # 在搭建模型时，default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg)
         for name, value in default_args.items():
-            args.setdefault(name, value)
-    return obj_cls(**args)
+            args.setdefault(name, value)                   # 如果键不存在字典中，添加默认自value。在args中添加default_args的字段
+    return obj_cls(**args)                                 # 返回coco类

@@ -1,3 +1,4 @@
+#encoding=utf-8
 from __future__ import division
 import re
 from collections import OrderedDict
@@ -35,11 +36,11 @@ def parse_losses(losses):
 
 
 def batch_processor(model, data, train_mode):
-    losses = model(**data)
+    losses = model(**data)                    # 将每个minibatch中的数据（图片和标签）传入到model中训练，输出前传的loss
     loss, log_vars = parse_losses(losses)
 
     outputs = dict(
-        loss=loss, log_vars=log_vars, num_samples=len(data['img'].data))
+        loss=loss, log_vars=log_vars, num_samples=len(data['img'].data))          # 这里可能要需要修改
 
     return outputs
 
@@ -57,7 +58,8 @@ def train_detector(model,
     if distributed:
         _dist_train(model, dataset, cfg, validate=validate)
     else:
-        _non_dist_train(model, dataset, cfg, validate=validate)
+        # print("none")                                            # 进行的是非分布式的训练
+        _non_dist_train(model, dataset, cfg, validate=validate)    # 验证参数设置为不验证
 
 
 def build_optimizer(model, optimizer_cfg):
@@ -188,8 +190,11 @@ def _dist_train(model, dataset, cfg, validate=False):
 
 def _non_dist_train(model, dataset, cfg, validate=False):
     # prepare data loaders
-    dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
-    data_loaders = [
+    dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]   # 确认dataset是一个list或者tuple
+    # template_dataset = template_dataset if isinstance(template_dataset, (list, tuple)) else [template_dataset]  # 确认dataset是一个list或者tuple
+
+    # load the data for per batch
+    data_loaders = [                                 # 调用该函数可实现每次返回minibatch张图片
         build_dataloader(
             ds,
             cfg.data.imgs_per_gpu,
@@ -198,13 +203,13 @@ def _non_dist_train(model, dataset, cfg, validate=False):
             dist=False) for ds in dataset
     ]
     # put model on gpus
-    model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
+    model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()   # 将模型送到GPU中，how to set data into gpus
 
     # build runner
-    optimizer = build_optimizer(model, cfg.optimizer)
-    runner = Runner(model, batch_processor, optimizer, cfg.work_dir,
+    optimizer = build_optimizer(model, cfg.optimizer)                   # 建立优化器
+    runner = Runner(model, batch_processor, optimizer, cfg.work_dir,    # 建立辅助Runner用来跑模型，进入后调用里面的train函数
                     cfg.log_level)
-    # fp16 setting
+    # fp16 setting                                                      # 应当是关于FPN层的设置
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         optimizer_config = Fp16OptimizerHook(
@@ -214,8 +219,10 @@ def _non_dist_train(model, dataset, cfg, validate=False):
     runner.register_training_hooks(cfg.lr_config, optimizer_config,
                                    cfg.checkpoint_config, cfg.log_config)
 
-    if cfg.resume_from:
+    if cfg.resume_from:                                                  # 选择恢复训练或者重新加载模型
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
-    runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
+
+    runner.run(data_loaders, cfg.workflow, cfg.total_epochs)              # 调用runner的run方法进行训练
+
