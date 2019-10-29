@@ -51,3 +51,28 @@
   2. *./code/mmdetection/mmdet/models/fpn.py* 
 
   
+  ## 如何使用
+  ### 如何进行训练
+  1.训练的主程序入口为./mmdetection/tools/train.py,其中除了可以设定GPU的使用个数和指定GPU训练外，并没有需要进行设定的参数  
+  2.进行训练需要指定配置文件，配置文件都集中放在./mmdetection/config文件夹下面  
+    **下面将介绍配置文件的详细使用方法：**   
+    2.1 在pycharm中开始训练时，直接在运行程序时的“edit configurations"中设置对应的配置文件地址  
+    2.2 在配置文件中的model dict中，“type”用来指定模型的整体框架，“pretrained”用来加载初始的预训练模型，若模型不包含在指定路径中，则程序会自动下载。其次  
+        其次，可在model dict中设定模型的其他组件。模型的所有组件均放在./mmdetection/mmdet文件夹下。  
+    2.3 dataset_type dict进行输入label格式的设定，一般设定为CocoDataset  
+    2.4 data dict中进行训练数据集和验证数据集的设置。在train dict中 anno_file和img_file分别指定标签文件和图片文件的路径，值得注意的是，这两个参数可以为列表的形式
+        即可以将多个路径同时赋值给该参数  
+    2.5 “optimizer”参数进行优化器的指定，其中“lr”在batch为1是设定为0.00125  
+    2.6 “total_epochs”进行迭代次数的设定   
+    2.7 “work_dir”指定每轮迭代完成后存放模型和日志文件的地址  
+    2.8 “load_from”和“resume_from”是开始训练和恢复训练时存放模型的地址，这两者同时有值时，先加载load_from。  
+  3.模型中的模块说明：  
+    - 模型的所有组成模块都是放在./mmdetection/mmdet文件夹下  
+    - 模型可由4部分组成：backbone,neck,head,roi extractor，在GETTING_START文件中有简单的介绍如何自己增加组件的方法  
+    - 每个组件的形式都是以class的形式存在的，定义一个新的组件相当于定义一个新的类  
+  
+ --------
+ ### 如何进行预测
+ 1.预测程序的入口为./mmdetection/tools/inference_final.py  
+ 2.在预测脚本中，需要进行预测数据集路径的设定，模型的设定，模型配置文件的设定，结果保存路径的设定等  
+ 3.在预测脚本中，还包含了许多扩展功能，它们都以函数的形式存在，可以方便的进行调用  
